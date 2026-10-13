@@ -362,58 +362,76 @@ async function processInvoiceImage(event) {
   if (!file) return;
 
   const statusEl = document.getElementById('scannerStatus');
-  statusEl.textContent = '🤖 جاري إرسال الفاتورة إلى الذكاء الاصطناعي للتحليل الفوري...';
+  statusEl.textContent = '⏳ جاري قراءة وفحص الفاتورة محلياً واستخراج البيانات بدقة...';
 
   try {
-    const base64Data = await toBase64(file);
-    const apiKey = "AQ.Ab8RN6KgqQBnw0MOnEQ2uEDcjJR4chsC01kEPVjwlu9uyo2mbA"; 
-
-    // استخدام صيغة طلب متوافقة تماماً مع متصفحات الويب لتجنب أخطاء الاتصال
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: "حلل هذه الفاتورة المالية بدقة وأخرج البيانات التالية حصرياً بصيغة JSON بدون أي كلام إضافي أو علامات markdown مثل json: {\"total\": رقم الإجمالي, \"subtotal\": المبلغ قبل الضريبة, \"tax\": قيمة الضريبة, \"discount\": الخصم, \"category\": التصنيف المناسب مثل (مشتريات بضاعة، مرافق، إيجار), \"description\": وصف مختصر}." },
-            {
-              inlineData: {
-                mimeType: file.type,
-                data: base64Data.split(',')[1]
-              }
-            }
-          ]
-        }]
-      })
+    const result = await Tesseract.recognize(file, 'ara+eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          statusEl.textContent = `⏳ جاري تحليل الصورة: ${Math.round(m.progress * 100)}%`;
+        }
+      }
     });
 
-    if (!response.ok) {
-      throw new Error('فشل الاتصال بخدمة الذكاء الاصطناعي');
+    const text = result.data.text || '';
+    const lines = text.split('\n');
+
+    let totalAmount = 0;
+    let subtotalAmount = 0;
+    let taxAmount = 0;
+    let discountAmount = 0;
+
+    const parseVal = str => {
+      let clean = str.replace(/[^0-9.]/g, '');
+      return parseFloat(clean) || 0;
+    };
+
+    for (let line of lines) {
+      const lower = line.toLowerCase();
+      const nums = line.match(/\d+([,.]\d+)?/g);
+      
+      if (!nums || nums.length === 0) continue;
+      const rawNumStr = nums[nums.length - 1].replace(/,/g, '');
+      const val = parseFloat(rawNumStr);
+
+      if (isNaN(val)) continue;
+
+      if (/إجمالي قبل الضريبة|قبل الضريبة|المجموع بدون|subtotal/i.test(lower)) {
+        subtotalAmount = val;
+      } else if (/قيمة الضريبة|ضريبة|vat|tax/i.test(lower)) {
+        taxAmount = val;
+      } else if (/خصم|discount/i.test(lower)) {
+        discountAmount = val;
+      } else if (/إجمالي|الاجمالي|total|المجموع|صافي|الصافي/i.test(lower)) {
+        totalAmount = val;
+      }
     }
 
-    const data = await response.json();
-    const aiText = data.candidates[0].content.parts[0].text;
+    if (!totalAmount) {
+      const allNums = text.match(/\d+([,.]\d+)?/g);
+      if (allNums) {
+        const valid = allNums.map(n => parseFloat(n.replace(/,/g, ''))).filter(n => !isNaN(n) && n > 0 && n < 100000);
+        if (valid.length > 0) totalAmount = Math.max(...valid);
+      }
+    }
+
+    // تعبئة الحقول في التطبيق بالقيم المستخرجة
+    document.getElementById('amount').value = totalAmount > 0 ? totalAmount : '';
+    document.getElementById('subtotal').value = subtotalAmount > 0 ? subtotalAmount : '';
+    document.getElementById('tax').value = taxAmount > 0 ? taxAmount : '';
+    document.getElementById('discount').value = discountAmount > 0 ? discountAmount : '';
     
-    // تنظيف رد الذكاء الاصطناعي واستخراج الـ JSON بدقة
-    const cleanJson = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
-    const invoiceData = JSON.parse(cleanJson);
-
-    // تعبئة حقول التطبيق تلقائياً
-    document.getElementById('amount').value = invoiceData.total || '';
-    document.getElementById('subtotal').value = invoiceData.subtotal || '';
-    document.getElementById('tax').value = invoiceData.tax || '';
-    document.getElementById('discount').value = invoiceData.discount || '';
-    document.getElementById('description').value = invoiceData.description || 'فاتورة مستخرجة بالذكاء الاصطناعي';
-    document.getElementById('category').value = invoiceData.category || 'مشتريات بضاعة';
+    document.getElementById('description').value = 'فاتورة مشتريات ومستلزمات (مفصلة ضريبياً)';
     document.getElementById('type').value = 'purchase';
+    document.getElementById('category').value = 'مشتريات بضاعة';
+    document.getElementById('notes').value = `التفاصيل المستخرجة:\n- قبل الضريبة: ${subtotalAmount}\n- الضريبة: ${taxAmount}\n- الإجمالي: ${totalAmount}`;
 
-    statusEl.textContent = '✨ نجح الذكاء الاصطناعي في تحليل الفاتورة واستخراج كافة التفاصيل بدقة!';
+    statusEl.textContent = '✅ تم قراءة الفاتورة وتعبئة الحقول بنجاح تام!';
   } catch (error) {
     console.error(error);
-    statusEl.textContent = '❌ حدث خطأ أثناء تحليل الفاتورة عبر الذكاء الاصطناعي. تأكد من تشغيل المشروع عبر Live Server.';
+    statusEl.textContent = '❌ حدث خطأ أثناء قراءة الصورة. تأكد من وضوح الفاتورة.';
   }
 }
-
 // دالة مساعدة لتحويل الصورة إلى Base64
 function toBase64(file) {
   return new Promise((resolve, reject) => {
