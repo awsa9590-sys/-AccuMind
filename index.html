@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f172a">
+<title>ميزان | المحاسبة الذكية</title>
+<!-- ربط ملف الـ CSS المنفصل -->
+<link rel="stylesheet" href="style.css">
+<!-- استدعاء مكتبة قراءة النصوص من الصور Tesseract.js الحقيقية -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@v5/dist/tesseract.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo">⚖️</div>
+      <div>
+        <h1>ميزان</h1>
+        <small>المحاسبة الذكية</small>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="active" data-page="dashboard">▦ لوحة التحكم</button>
+      <button data-page="transactions">⇄ الحركات المالية</button>
+      <button data-page="add">＋ إضافة حركة</button>
+      <button data-page="reports">▤ التقارير المالية</button>
+      <button data-page="settings">⚙ الإعدادات والبيانات</button>
+    </nav>
+    <div class="side-note">
+      💡 <strong>نسخة العرض الذكية</strong><br>
+      تدعم قراءة الفواتير وتفاصيلها الضريبية بالذكاء الاصطناعي.
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="secondary mobile-menu" id="menuBtn">☰</button>
+        <div>
+          <h2 id="topTitle">لوحة التحكم</h2>
+          <p id="today"></p>
+        </div>
+      </div>
+      <div class="user-chip" id="chipBusinessName">مشروعي التجاري</div>
+    </header>
+
+    <div class="content">
+      <!-- لوحة التحكم -->
+      <section class="page active" id="page-dashboard">
+        <div class="page-head">
+          <div>
+            <h3>ملخص النشاط المالي</h3>
+            <p>متابعة وتحليل مؤشرات الأداء المالي بأسلوب عصري ودقيق.</p>
+          </div>
+          <button class="primary" onclick="showPage('add')">＋ تسجيل حركة جديدة</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="label">إجمالي الإيرادات</div>
+            <div class="value green" id="statIncome">0.00 ج.م</div>
+            <div class="hint">↑ مبيعات وإيرادات النشاط</div>
+          </div>
+          <div class="stat">
+            <div class="label">إجمالي المصروفات</div>
+            <div class="value red" id="statExpense">0.00 ج.م</div>
+            <div class="hint">مصروفات تشغيلية وعمومية</div>
+          </div>
+          <div class="stat">
+            <div class="label">صافي الربح الفعلي</div>
+            <div class="value" id="statNet">0.00 ج.م</div>
+            <div class="hint">الإيرادات - المصروفات</div>
+          </div>
+          <div class="stat">
+            <div class="label">إجمالي المشتريات</div>
+            <div class="value red" style="color: var(--warning-gold);" id="statPurchase">0.00 ج.م</div>
+            <div class="hint">بضائع ومستلزمات المخزون</div>
+          </div>
+        </div>
+
+        <!-- صندوق تحليلات الذكاء الاصطناعي -->
+        <div class="ai-box">
+          <h4>🤖 تحليل الذكاء الاصطناعي والتوصيات الذكية</h4>
+          <ul id="aiList">
+            <li>قم بتسجيل أول حركة مالية لبدء توليد التوصيات والتحليلات الفورية.</li>
+          </ul>
+        </div>
+
+        <div class="grid2">
+          <div class="panel">
+            <h4>آخر الحركات المسجلة</h4>
+            <div class="panel-sub">أحدث 6 حركات مالية تم إدخالها</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>التاريخ</th>
+                    <th>البيان</th>
+                    <th>النوع</th>
+                    <th>المبلغ</th>
+                  </tr>
+                </thead>
+                <tbody id="recentRows"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h4>مقارنة التدفقات المالية</h4>
+            <div class="panel-sub">نظرة عامة لتوزيع المبالغ بين الأقسام</div>
+            <div class="bars" id="summaryBars"></div>
+            <div class="notice" style="margin-top:18px">
+              ℹ️ تنبيه: البيانات المعروضة مبنية على إدخالاتك التلقائية.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- الحركات المالية -->
+      <section class="page" id="page-transactions">
+        <div class="page-head">
+          <div>
+            <h3>سجل الحركات المالية</h3>
+            <p>بحث وإدارة وسحب كافة العمليات المالية المسجلة.</p>
+          </div>
+          <button class="primary" onclick="showPage('add')">＋ إضافة حركة</button>
+        </div>
+
+        <div class="panel">
+          <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+            <div class="search">
+              <input id="searchInput" placeholder="ابحث في البيان أو التصنيف..." oninput="renderTransactions()">
+            </div>
+            <button class="secondary" onclick="exportCSV()">📥 تصدير ملف CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>التاريخ</th>
+                  <th>البيان</th>
+                  <th>التصنيف</th>
+                  <th>النوع</th>
+                  <th>المبلغ</th>
+                  <th>إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="allRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- إضافة حركة وقارئ الفواتير المفصل -->
+      <section class="page" id="page-add">
+        <div class="page-head">
+          <div>
+            <h3>تسجيل حركة مالية أو فحص فاتورة ضريبية</h3>
+            <p>ارفع صورة الفاتورة ليقوم النظام باستخراج الإجمالي، السعر قبل الضريبة، والضرائب آلياً.</p>
+          </div>
+        </div>
+
+        <!-- صندوق قراءة الفواتير الحقيقي -->
+        <div class="scanner-box">
+          <h4>📸 ماسح الفواتير الضوئي بالذكاء الاصطناعي (OCR)</h4>
+          <p style="color: var(--text-muted); font-size: 13px; margin: 5px 0 15px;">اختر صورة فاتورة لاستخراج التفاصيل والمبالغ وتعبئة الحقول تلقائياً</p>
+          <label class="scanner-btn" for="invoiceImageInput">اختر صورة الفاتورة الآن</label>
+          <input type="file" id="invoiceImageInput" accept="image/*" onchange="processInvoiceImage(event)">
+          <div id="scannerStatus" style="margin-top: 12px; font-size: 13px; color: var(--accent-blue); font-weight: bold;"></div>
+        </div>
+
+        <div class="panel">
+          <form id="transactionForm">
+            <div class="form-grid">
+              <div class="field">
+                <label for="date">التاريخ</label>
+                <input type="date" id="date" required>
+              </div>
+              <div class="field">
+                <label for="type">نوع الحركة</label>
+                <select id="type" required>
+                  <option value="income">إيراد / مبيعات (نقدي)</option>
+                  <option value="expense">مصروف تشغيلي</option>
+                  <option value="purchase">مشتريات مخزون</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label for="description">البيان / الوصف</label>
+                <input id="description" maxlength="120" placeholder="مثال: مبيعات بضاعة محل" required>
+              </div>
+              <div class="field">
+                <label for="category">التصنيف</label>
+                <select id="category">
+                  <option>مبيعات</option>
+                  <option>خدمات</option>
+                  <option>إيجار</option>
+                  <option>رواتب</option>
+                  <option>مرافق</option>
+                  <option>نقل وشحن</option>
+                  <option>مشتريات بضاعة</option>
+                  <option>أدوات ومستلزمات</option>
+                  <option>صيانة</option>
+                  <option>أخرى</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="amount">المبلغ الإجمالي النهائي (ج.م / ر.س)</label>
+                <input type="number" id="amount" min="0.01" step="0.01" placeholder="0.00" required>
+              </div>
+              <!-- الحقول الجديدة لتفاصيل الفاتورة الضريبية -->
+              <div class="field">
+                <label for="subtotal">المبلغ قبل الضريبة (اختياري)</label>
+                <input type="number" id="subtotal" step="0.01" placeholder="0.00">
+              </div>
+              <div class="field">
+                <label for="tax">قيمة الضريبة (اختياري)</label>
+                <input type="number" id="tax" step="0.01" placeholder="0.00">
+              </div>
+              <div class="field">
+                <label for="discount">قيمة الخصم (اختياري)</label>
+                <input type="number" id="discount" step="0.01" placeholder="0.00">
+              </div>
+              <div class="field full">
+                <label for="notes">ملاحظات إضافية (اختياري)</label>
+                <textarea id="notes" rows="2" maxlength="300" placeholder="رقم الفاتورة أو التفاصيل المستخرجة"></textarea>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="primary" type="submit">حفظ الحركة وتحديث الميزان</button>
+              <button class="secondary" type="reset">إعادة ضبط الحقول</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- التقارير المالية -->
+      <section class="page" id="page-reports">
+        <div class="page-head">
+          <div>
+            <h3>التقارير القوائم المالية</h3>
+            <p>قائمة الدخل والملخص التجميعي المولد تلقائياً.</p>
+          </div>
+          <button class="secondary" onclick="exportCSV()">تنزيل سجل الحركات</button>
+        </div>
+
+        <div class="grid2">
+          <div class="panel">
+            <h4>قائمة الدخل المبسطة</h4>
+            <div class="panel-sub">حسب إجمالي الحركات المرفوعة للنظام</div>
+            <div class="report-lines" id="incomeReport"></div>
+          </div>
+
+          <div class="panel">
+            <h4>توزيع المبالغ حسب التصنيف</h4>
+            <div class="panel-sub">تجميع إجمالي المبالغ لكل بند</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>التصنيف</th>
+                    <th>النوع</th>
+                    <th>الإجمالي</th>
+                  </tr>
+                </thead>
+                <tbody id="categoryRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>مؤشرات متابعة الأداء</h4>
+          <div class="grid2" style="gap:10px">
+            <div class="notice success-note" id="marginNote">هامش الربح: لا توجد بيانات كافية.</div>
+            <div class="notice" id="purchaseNote">المشتريات لا تخصم مباشرة كربح حتى يتم بيع البضائع.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- الإعدادات والبيانات -->
+      <section class="page" id="page-settings">
+        <div class="page-head">
+          <div>
+            <h3>الإعدادات والبيانات المحلية</h3>
+            <p>تخصيص النشاط التجاري وإدارة البيانات الحالية.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>بيانات النشاط التجاري</h4>
+          <div class="field" style="max-width:450px; margin-bottom:15px;">
+            <label for="businessName">اسم النشاط التجاري / المحل</label>
+            <input id="businessName" value="مشروعي التجاري" maxlength="80">
+          </div>
+          <div class="form-actions">
+            <button class="primary" onclick="saveBusinessName()">حفظ اسم النشاط</button>
+            <button class="secondary" onclick="loadDemo()">تحميل بيانات عرض تجريبية</button>
+            <button class="danger" onclick="clearAll()">مسح كافة البيانات المحلية</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>المواصفات الفنية للنظام</h4>
+          <ul>
+            <li>واجهة متجاوبة بالكامل مع الأجهزة الذكية والأجهزة المكتبية.</li>
+            <li>حفظ تلقائي للبيانات بداخل المتصفح عبر Local Storage دون فقدان.</li>
+            <li>ميزة التعرف الضوئي الذكي واستخراج التفاصيل الضريبية للفواتير آلياً.</li>
+          </ul>
+        </div>
+      </section>
+
+      <div class="foot">
+        ⚖️ ميزان Mizan Smart Accounting · تصميم ونظام ذكي لإدارة المحاسبة للمشروعات الصغيرة
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const KEY = 'mizan_transactions_v7', NAMEKEY = 'mizan_business_name_v7';
+let transactions = [];
+
+try {
+  transactions = JSON.parse(localStorage.getItem(KEY) || '[]');
+  if (!Array.isArray(transactions)) transactions = [];
+} catch (e) {
+  transactions = [];
+}
+
+const fmt = n => new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 2 }).format(Number(n) || 0);
+const num = n => Number(n || 0);
+const typeName = t => ({ income: 'إيراد', expense: 'مصروف', purchase: 'مشتريات' })[t] || t;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function persist() {
+  localStorage.setItem(KEY, JSON.stringify(transactions));
+  renderAll();
+}
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.page === name));
+  const labels = {
+    dashboard: 'لوحة التحكم',
+    transactions: 'الحركات المالية',
+    add: 'إضافة حركة',
+    reports: 'التقارير المالية',
+    settings: 'الإعدادات والبيانات'
+  };
+  document.getElementById('topTitle').textContent = labels[name] || 'ميزان';
+  document.getElementById('sidebar').classList.remove('open');
+  if (name === 'transactions') renderTransactions();
+}
+
+document.querySelectorAll('.nav button').forEach(b => b.addEventListener('click', () => showPage(b.dataset.page)));
+document.getElementById('menuBtn').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
+document.getElementById('today').textContent = new Intl.DateTimeFormat('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date());
+document.getElementById('date').value = new Date().toISOString().slice(0, 10);
+async function processInvoiceImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById('scannerStatus');
+  statusEl.textContent = '🤖 جاري إرسال الفاتورة إلى الذكاء الاصطناعي للتحليل الفوري...';
+
+  try {
+    const base64Data = await toBase64(file);
+    const apiKey = "AQ.Ab8RN6KgqQBnw0MOnEQ2uEDcjJR4chsC01kEPVjwlu9uyo2mbA"; 
+
+    // استخدام صيغة طلب متوافقة تماماً مع متصفحات الويب لتجنب أخطاء الاتصال
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: "حلل هذه الفاتورة المالية بدقة وأخرج البيانات التالية حصرياً بصيغة JSON بدون أي كلام إضافي أو علامات markdown مثل json: {\"total\": رقم الإجمالي, \"subtotal\": المبلغ قبل الضريبة, \"tax\": قيمة الضريبة, \"discount\": الخصم, \"category\": التصنيف المناسب مثل (مشتريات بضاعة، مرافق، إيجار), \"description\": وصف مختصر}." },
+            {
+              inlineData: {
+                mimeType: file.type,
+                data: base64Data.split(',')[1]
+              }
+            }
+          ]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('فشل الاتصال بخدمة الذكاء الاصطناعي');
+    }
+
+    const data = await response.json();
+    const aiText = data.candidates[0].content.parts[0].text;
+    
+    // تنظيف رد الذكاء الاصطناعي واستخراج الـ JSON بدقة
+    const cleanJson = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const invoiceData = JSON.parse(cleanJson);
+
+    // تعبئة حقول التطبيق تلقائياً
+    document.getElementById('amount').value = invoiceData.total || '';
+    document.getElementById('subtotal').value = invoiceData.subtotal || '';
+    document.getElementById('tax').value = invoiceData.tax || '';
+    document.getElementById('discount').value = invoiceData.discount || '';
+    document.getElementById('description').value = invoiceData.description || 'فاتورة مستخرجة بالذكاء الاصطناعي';
+    document.getElementById('category').value = invoiceData.category || 'مشتريات بضاعة';
+    document.getElementById('type').value = 'purchase';
+
+    statusEl.textContent = '✨ نجح الذكاء الاصطناعي في تحليل الفاتورة واستخراج كافة التفاصيل بدقة!';
+  } catch (error) {
+    console.error(error);
+    statusEl.textContent = '❌ حدث خطأ أثناء تحليل الفاتورة عبر الذكاء الاصطناعي. تأكد من تشغيل المشروع عبر Live Server.';
+  }
+}
+
+// دالة مساعدة لتحويل الصورة إلى Base64
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+}
+
+document.getElementById('transactionForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const item = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    date: document.getElementById('date').value,
+    type: document.getElementById('type').value,
+    description: document.getElementById('description').value.trim(),
+    category: document.getElementById('category').value,
+    amount: num(document.getElementById('amount').value),
+    subtotal: num(document.getElementById('subtotal').value),
+    tax: num(document.getElementById('tax').value),
+    discount: num(document.getElementById('discount').value),
+    notes: document.getElementById('notes').value.trim()
+  };
+
+  if (!item.description || item.amount <= 0) {
+    alert('يرجى مراجعة البيان والمبلغ الإجمالي.');
+    return;
+  }
+
+  transactions.push(item);
+  persist();
+  e.target.reset();
+  document.getElementById('date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('scannerStatus').textContent = '';
+  showPage('dashboard');
+});
+
+function sums() {
+  return transactions.reduce((a, t) => {
+    if (t.type === 'income') a.income += num(t.amount);
+    else if (t.type === 'expense') a.expense += num(t.amount);
+    else if (t.type === 'purchase') a.purchase += num(t.amount);
+    return a;
+  }, { income: 0, expense: 0, purchase: 0 });
+}
+
+function badge(t) {
+  return `<span class="pill ${t}">${typeName(t)}</span>`;
+}
+
+function renderAll() {
+  const s = sums(), net = s.income - s.expense;
+  
+  document.getElementById('statIncome').textContent = fmt(s.income);
+  document.getElementById('statExpense').textContent = fmt(s.expense);
+  document.getElementById('statPurchase').textContent = fmt(s.purchase);
+  document.getElementById('statNet').textContent = fmt(net);
+  document.getElementById('statNet').className = 'value ' + (net >= 0 ? 'green' : 'red');
+
+  const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+  document.getElementById('recentRows').innerHTML = recent.length ? recent.map(t => `
+    <tr>
+      <td>${esc(t.date)}</td>
+      <td>${esc(t.description)}</td>
+      <td>${badge(t.type)}</td>
+      <td>${fmt(t.amount)}</td>
+    </tr>
+  `).join('') : `<tr><td colspan="4" class="empty">لا توجد حركات مسجلة حتى الآن.</td></tr>`;
+
+  const max = Math.max(s.income, s.expense, s.purchase, 1);
+  document.getElementById('summaryBars').innerHTML = [
+    ['الإيرادات', s.income, ''],
+    ['المصروفات', s.expense, 'exp'],
+    ['المشتريات', s.purchase, 'pur']
+  ].map(x => `
+    <div class="bar-row">
+      <span>${x[0]}</span>
+      <div class="bar-track">
+        <div class="bar-fill ${x[2]}" style="width:${Math.max(0, x[1] / max * 100)}%"></div>
+      </div>
+      <strong>${fmt(x[1])}</strong>
+    </div>
+  `).join('');
+
+  updateAIInsights(s, net);
+  renderTransactions();
+  renderReports();
+}
+
+function updateAIInsights(s, net) {
+  const aiList = document.getElementById('aiList');
+  let insights = [];
+
+  if (transactions.length === 0) {
+    aiList.innerHTML = '<li>قم بتسجيل أول حركة مالية لبدء توليد التوصيات والتحليلات الفورية.</li>';
+    return;
+  }
+
+  if (s.income > 0) {
+    const margin = (net / s.income) * 100;
+    if (margin > 30) {
+      insights.push(`معدل صافي الربح ممتاز بـ (${margin.toFixed(1)}%) مقارنة بالإيرادات المحققة.`);
+    } else if (margin > 0) {
+      insights.push(`هامش الربح الإيجابي الحالي هو (${margin.toFixed(1)}%)؛ ينصح بتقليل المصروفات للرفع من الربحية.`);
+    } else {
+      insights.push(`⚠️ تنبيه: المصروفات تتجاوز الإيرادات حالياً بـ (${fmt(Math.abs(net))}).`);
+    }
+  }
+
+  if (s.purchase > s.income && s.income > 0) {
+    insights.push(`مشتريات البضائع مرتفعة عن حجم الإيرادات هذا الشهر؛ يوصى بمراجعة إدارة المخزون.`);
+  }
+
+  if (s.expense > 0 && s.income > 0 && (s.expense / s.income) > 0.5) {
+    insights.push(`تنبيه: المصروفات التشغيلية تشكل أكثر من 50% من إجمالي الإيرادات.`);
+  }
+
+  if (insights.length === 0) {
+    insights.push('الأداء المالي متوازن وفق البيانات المدخلة.');
+  }
+
+  aiList.innerHTML = insights.map(i => `<li>${i}</li>`).join('');
+}
+
+function renderTransactions() {
+  const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  const rows = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).filter(t => 
+    (t.description + ' ' + t.category + ' ' + typeName(t.type)).toLowerCase().includes(q)
+  );
+
+  document.getElementById('allRows').innerHTML = rows.length ? rows.map(t => `
+    <tr>
+      <td>${esc(t.date)}</td>
+      <td>${esc(t.description)}${t.notes ? `<div class="small">${esc(t.notes)}</div>` : ''}</td>
+      <td>${esc(t.category)}</td>
+      <td>${badge(t.type)}</td>
+      <td>${fmt(t.amount)}</td>
+      <td><button class="danger" style="padding:4px 10px; font-size:12px;" onclick="deleteTransaction('${t.id}')">حذف</button></td>
+    </tr>
+  `).join('') : `<tr><td colspan="6" class="empty">لا توجد نتائج مطابقة.</td></tr>`;
+}
+
+function deleteTransaction(id) {
+  if (!confirm('هل تريد حذف هذه الحركة من السجل؟')) return;
+  transactions = transactions.filter(t => t.id !== id);
+  persist();
+}
+
+function renderReports() {
+  const s = sums(), net = s.income - s.expense;
+  const lines = [
+    ['إجمالي الإيرادات والمبيعات', s.income, ''],
+    ['(-) المصروفات التشغيلية', -s.expense, 'sub'],
+    ['صافي النتيجة التشغيلية (الربح)', net, 'total'],
+    ['إجمالي مشتريات المخزون (بيان مستقل)', s.purchase, 'sub']
+  ];
+
+  document.getElementById('incomeReport').innerHTML = lines.map(x => `
+    <div class="report-line ${x[2]}">
+      <span>${x[0]}</span>
+      <strong>${fmt(x[1])}</strong>
+    </div>
+  `).join('');
+
+  const map = {};
+  transactions.forEach(t => {
+    const k = t.category + '|' + t.type;
+    map[k] = (map[k] || 0) + num(t.amount);
+  });
+
+  const arr = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  document.getElementById('categoryRows').innerHTML = arr.length ? arr.map(([k, v]) => {
+    const [cat, ty] = k.split('|');
+    return `<tr><td>${esc(cat)}</td><td>${badge(ty)}</td><td>${fmt(v)}</td></tr>`;
+  }).join('') : `<tr><td colspan="3" class="empty">لا توجد بيانات متاحة.</td></tr>`;
+
+  const margin = s.income ? (net / s.income) * 100 : 0;
+  document.getElementById('marginNote').textContent = s.income ? 
+    `هامش صافي الربح: ${margin.toLocaleString('ar-EG', { maximumFractionDigits: 1 })}%` : 
+    'هامش الربح: قم بإضافة إيرادات لاحتسابه تلقائياً.';
+  document.getElementById('purchaseNote').textContent = `إجمالي المشتريات المسجلة: ${fmt(s.purchase)}.`;
+}
+
+function exportCSV() {
+  if (!transactions.length) {
+    alert('لا توجد بيانات متاحة للتصدير.');
+    return;
+  }
+  const rows = [
+    ['التاريخ', 'البيان', 'التصنيف', 'النوع', 'المبلغ بالجنيه', 'ملاحظات'],
+    ...transactions.map(t => [t.date, t.description, t.category, typeName(t.type), t.amount, t.notes || ''])
+  ];
+  const csv = '\ufeff' + rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mizan_financial_records.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function clearAll() {
+  if (!confirm('هل أنت متأكد من مسح كافة البيانات المحفوظة على هذا الجهاز؟')) return;
+  transactions = [];
+  persist();
+  alert('تم حذف البيانات بنجاح.');
+}
+
+function loadDemo() {
+  if (transactions.length && !confirm('سيتم دمج حركات تجريبية مع البيانات الحالية، هل ترغب بالمتابعة؟')) return;
+  const d = new Date();
+  const day = n => {
+    const x = new Date(d);
+    x.setDate(x.getDate() - n);
+    return x.toISOString().slice(0, 10);
+  };
+
+  transactions.push(
+    { id: 'd1', date: day(5), type: 'income', description: 'مبيعات يومية إجمالية', category: 'مبيعات', amount: 125000, notes: 'بيانات عرض' },
+    { id: 'd2', date: day(4), type: 'expense', description: 'مصروفات تشغيل ومستلزمات', category: 'أخرى', amount: 78500, notes: 'بيانات عرض' },
+    { id: 'd3', date: day(3), type: 'purchase', description: 'شراء بضاعة ومخزون جديد', category: 'مشتريات بضاعة', amount: 32000, notes: 'بيانات عرض' },
+    { id: 'd4', date: day(2), type: 'income', description: 'تحصيل مبيعات آجلة', category: 'مبيعات', amount: 15000, notes: 'بيانات عرض' },
+    { id: 'd5', date: day(1), type: 'expense', description: 'إيجار وكهرباء المحل', category: 'مرافق', amount: 4500, notes: 'بيانات عرض' }
+  );
+
+  persist();
+  showPage('dashboard');
+}
+
+function saveBusinessName() {
+  const n = document.getElementById('businessName').value.trim() || 'مشروعي التجاري';
+  localStorage.setItem(NAMEKEY, n);
+  document.getElementById('chipBusinessName').textContent = n;
+  alert('تم حفظ اسم النشاط التجاري بنجاح.');
+}
+
+// Initial Load
+document.getElementById('businessName').value = localStorage.getItem(NAMEKEY) || 'مشروعي التجاري';
+document.getElementById('chipBusinessName').textContent = document.getElementById('businessName').value;
+renderAll();
+</script>
+</body>
+</html>
