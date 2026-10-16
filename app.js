@@ -9,6 +9,172 @@
     SUPABASE_URL,
     SUPABASE_PUBLISHABLE_KEY
   );
+    // شاشة تسجيل الدخول وإنشاء الحساب
+  const authScreen = document.createElement('div');
+
+  authScreen.id = 'mizan-auth-screen';
+
+  authScreen.style.cssText = `
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #071426;
+    direction: rtl;
+    font-family: Arial, sans-serif;
+  `;
+
+  authScreen.innerHTML = `
+    <div style="
+      width: 100%;
+      max-width: 420px;
+      padding: 30px;
+      border-radius: 18px;
+      background: #fff;
+      color: #071426;
+      box-shadow: 0 20px 60px #0005;
+    ">
+      <div style="text-align:center; margin-bottom:24px">
+        <h1 style="margin:0 0 10px">ميزان</h1>
+        <p style="margin:0;color:#64748b">
+          المحاسبة الذكية
+        </p>
+      </div>
+
+      <h2 id="mizan-auth-title" style="font-size:22px">
+        تسجيل الدخول
+      </h2>
+
+      <form id="mizan-auth-form">
+        <label for="mizan-auth-email">البريد الإلكتروني</label>
+        <input
+          id="mizan-auth-email"
+          type="email"
+          autocomplete="email"
+          required
+          placeholder="name@example.com"
+          style="box-sizing:border-box;width:100%;padding:12px;margin:8px 0 18px;border:1px solid #cbd5e1;border-radius:8px"
+        >
+
+        <label for="mizan-auth-password">كلمة المرور</label>
+        <input
+          id="mizan-auth-password"
+          type="password"
+          autocomplete="current-password"
+          required
+          minlength="6"
+          placeholder="6 أحرف على الأقل"
+          style="box-sizing:border-box;width:100%;padding:12px;margin:8px 0 18px;border:1px solid #cbd5e1;border-radius:8px"
+        >
+
+        <button
+          id="mizan-auth-submit"
+          type="submit"
+          style="width:100%;padding:13px;background:#0f172a;color:white;border:0;border-radius:8px;cursor:pointer;font-size:16px"
+        >
+          تسجيل الدخول
+        </button>
+      </form>
+
+      <p id="mizan-auth-message"
+         role="status"
+         style="font-size:14px;line-height:1.7"></p>
+
+      <button
+        id="mizan-auth-toggle"
+        type="button"
+        style="width:100%;margin-top:10px;padding:10px;background:transparent;border:0;color:#2563eb;cursor:pointer"
+      >
+        إنشاء حساب جديد
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(authScreen);
+
+  let authMode = 'login';
+
+  const authForm = document.getElementById('mizan-auth-form');
+  const authEmail = document.getElementById('mizan-auth-email');
+  const authPassword = document.getElementById('mizan-auth-password');
+  const authMessage = document.getElementById('mizan-auth-message');
+  const authSubmit = document.getElementById('mizan-auth-submit');
+  const authTitle = document.getElementById('mizan-auth-title');
+  const authToggle = document.getElementById('mizan-auth-toggle');
+
+  authToggle.addEventListener('click', () => {
+    authMode = authMode === 'login' ? 'signup' : 'login';
+
+    authTitle.textContent =
+      authMode === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب جديد';
+
+    authSubmit.textContent =
+      authMode === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب';
+
+    authToggle.textContent =
+      authMode === 'login'
+        ? 'إنشاء حساب جديد'
+        : 'لديك حساب؟ سجل الدخول';
+
+    authPassword.autocomplete =
+      authMode === 'login' ? 'current-password' : 'new-password';
+
+    authMessage.textContent = '';
+  });
+
+  authForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    authSubmit.disabled = true;
+    authMessage.style.color = '#475569';
+    authMessage.textContent = 'جارٍ تنفيذ الطلب...';
+
+    try {
+      const email = authEmail.value.trim();
+      const password = authPassword.value;
+
+      const result = authMode === 'login'
+        ? await sb.auth.signInWithPassword({ email, password })
+        : await sb.auth.signUp({ email, password });
+
+      if (result.error) throw result.error;
+
+      if (authMode === 'signup' && !result.data.session) {
+        authMessage.style.color = '#15803d';
+        authMessage.textContent =
+          'تم إنشاء الحساب. راجع بريدك الإلكتروني لتأكيده، ثم سجّل الدخول.';
+      } else if (result.data.session) {
+        authMessage.style.color = '#15803d';
+        authMessage.textContent = 'تم تسجيل الدخول بنجاح.';
+      } else {
+        authMessage.textContent =
+          'تم الطلب. اتبع التعليمات الظاهرة لك لإكمال الدخول.';
+      }
+    } catch (error) {
+      authMessage.style.color = '#dc2626';
+      authMessage.textContent =
+        error.message || 'حدث خطأ. حاول مرة أخرى.';
+    } finally {
+      authSubmit.disabled = false;
+    }
+  });
+
+  // إظهار التطبيق للمستخدم المسجل فقط
+  sb.auth.onAuthStateChange((_event, session) => {
+    authScreen.style.display = session ? 'none' : 'flex';
+  });
+
+  sb.auth.getSession().then(({ data, error }) => {
+    if (error) {
+      authMessage.textContent = 'تعذر التحقق من تسجيل الدخول.';
+      return;
+    }
+
+    authScreen.style.display = data.session ? 'none' : 'flex';
+  });
   const STORE = { transactions: 'mizan_transactions_v8', products: 'mizan_products_v8', contacts: 'mizan_contacts_v8', settings: 'mizan_settings_v8', journals: 'mizan_journals_v1', documents: 'mizan_erp_documents_v1', assets: 'mizan_fixed_assets_v1', projects: 'mizan_projects_v1', bankItems: 'mizan_bank_items_v1', auditLog: 'mizan_audit_log_v1' };
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
