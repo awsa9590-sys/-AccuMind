@@ -1,6 +1,14 @@
 /* ميزان — نموذج أولي محاسبي يعمل محليًا في المتصفح. */
 (() => {
   'use strict';
+    // الاتصال بقاعدة بيانات Supabase
+  const SUPABASE_URL = 'https://dpmnbthmorzzzqynqswd.supabase.co/rest/v1/';
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_s6VZuPwcm471z2kZoadVOw_fcnVBS84';
+
+  const sb = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+  );
   const STORE = { transactions: 'mizan_transactions_v8', products: 'mizan_products_v8', contacts: 'mizan_contacts_v8', settings: 'mizan_settings_v8', journals: 'mizan_journals_v1', documents: 'mizan_erp_documents_v1', assets: 'mizan_fixed_assets_v1', projects: 'mizan_projects_v1', bankItems: 'mizan_bank_items_v1', auditLog: 'mizan_audit_log_v1' };
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
