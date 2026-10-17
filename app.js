@@ -2,7 +2,7 @@
 (() => {
   'use strict';
     // الاتصال بقاعدة بيانات Supabase
-  const SUPABASE_URL = 'https://dpmnbthmorzzzqynqswd.supabase.co/rest/v1/';
+  const SUPABASE_URL = 'https://dpmnbthmorzzzqynqswd.supabase.co';
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_s6VZuPwcm471z2kZoadVOw_fcnVBS84';
 
   const sb = window.supabase.createClient(
