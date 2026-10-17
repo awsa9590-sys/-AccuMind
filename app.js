@@ -162,37 +162,42 @@
     }
   });
   // إظهار التطبيق للمستخدم المسجل فقط
+ 
+  // إنشاء شريط الحساب داخل صفحة الإعدادات والبيانات
   const accountBar = document.createElement('div');
+  accountBar.id = 'mizan-account-bar';
 
   accountBar.style.cssText = `
-    position: fixed;
-    top: 12px;
-    left: 12px;
-    z-index: 999998;
-    display: none;
+    display: flex;
     align-items: center;
-    gap: 10px;
-    max-width: calc(100vw - 24px);
-    padding: 10px 12px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 16px 0;
+    padding: 16px;
     border: 1px solid #cbd5e1;
     border-radius: 12px;
-    background: white;
-    color: #071426;
-    box-shadow: 0 5px 22px #0002;
+    background: #ffffff;
+    color: #0f172a;
     direction: rtl;
-    font: 14px Arial, sans-serif;
+    font-family: Arial, sans-serif;
   `;
 
   accountBar.innerHTML = `
-    <span id="mizan-account-email"
-      style="max-width:220px;overflow-wrap:anywhere"></span>
+    <div>
+      <div style="font-weight:bold;margin-bottom:6px">
+        الحساب المسجل
+      </div>
+      <span id="mizan-account-email"
+        style="overflow-wrap:anywhere;color:#475569"></span>
+    </div>
+
     <button id="mizan-logout" type="button"
-      style="padding:8px 10px;background:#dc2626;color:white;border:0;border-radius:8px;cursor:pointer">
+      style="padding:10px 14px;background:#dc2626;color:white;border:0;border-radius:8px;cursor:pointer">
       تسجيل الخروج
     </button>
   `;
 
-  document.body.appendChild(accountBar);
 
   const updateMizanAuthUI = (session) => {
     const loggedIn = Boolean(session);
