@@ -161,19 +161,79 @@
       authSubmit.disabled = false;
     }
   });
-
   // إظهار التطبيق للمستخدم المسجل فقط
+  const accountBar = document.createElement('div');
+
+  accountBar.style.cssText = `
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 999998;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100vw - 24px);
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    background: white;
+    color: #071426;
+    box-shadow: 0 5px 22px #0002;
+    direction: rtl;
+    font: 14px Arial, sans-serif;
+  `;
+
+  accountBar.innerHTML = `
+    <span id="mizan-account-email"
+      style="max-width:220px;overflow-wrap:anywhere"></span>
+    <button id="mizan-logout" type="button"
+      style="padding:8px 10px;background:#dc2626;color:white;border:0;border-radius:8px;cursor:pointer">
+      تسجيل الخروج
+    </button>
+  `;
+
+  document.body.appendChild(accountBar);
+
+  const updateMizanAuthUI = (session) => {
+    const loggedIn = Boolean(session);
+
+    authScreen.style.display = loggedIn ? 'none' : 'flex';
+    accountBar.style.display = loggedIn ? 'flex' : 'none';
+
+    document.getElementById('mizan-account-email').textContent =
+      session?.user?.email || 'حسابي';
+  };
+
+  document.getElementById('mizan-logout')
+    .addEventListener('click', async () => {
+      const button = document.getElementById('mizan-logout');
+
+      button.disabled = true;
+      button.textContent = 'جارٍ الخروج...';
+
+      try {
+        const { error } = await sb.auth.signOut();
+        if (error) throw error;
+      } catch (error) {
+        alert('تعذر تسجيل الخروج: ' + error.message);
+      } finally {
+        button.disabled = false;
+        button.textContent = 'تسجيل الخروج';
+      }
+    });
+
   sb.auth.onAuthStateChange((_event, session) => {
-    authScreen.style.display = session ? 'none' : 'flex';
+    updateMizanAuthUI(session);
   });
 
   sb.auth.getSession().then(({ data, error }) => {
     if (error) {
       authMessage.textContent = 'تعذر التحقق من تسجيل الدخول.';
+      updateMizanAuthUI(null);
       return;
     }
 
-    authScreen.style.display = data.session ? 'none' : 'flex';
+    updateMizanAuthUI(data.session);
   });
   const STORE = { transactions: 'mizan_transactions_v8', products: 'mizan_products_v8', contacts: 'mizan_contacts_v8', settings: 'mizan_settings_v8', journals: 'mizan_journals_v1', documents: 'mizan_erp_documents_v1', assets: 'mizan_fixed_assets_v1', projects: 'mizan_projects_v1', bankItems: 'mizan_bank_items_v1', auditLog: 'mizan_audit_log_v1' };
   const $ = (selector, root = document) => root.querySelector(selector);
