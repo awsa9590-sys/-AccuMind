@@ -227,6 +227,15 @@
       }
     });
 
+  // تحديث مكان شريط الحساب عند التنقل بين الصفحات
+  document.querySelectorAll('.nav-link[data-page]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      sb.auth.getSession().then(({ data }) => {
+        updateMizanAuthUI(data?.session || null);
+      });
+    });
+  });
+
   sb.auth.onAuthStateChange((_event, session) => {
     updateMizanAuthUI(session);
   });
