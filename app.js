@@ -228,7 +228,29 @@
     document.getElementById('mizan-account-email').textContent =
       session?.user?.email || 'حسابي';
   };
+  // تشغيل زر تسجيل الخروج
+  document.getElementById('mizan-logout')
+    .addEventListener('click', async () => {
+      const button = document.getElementById('mizan-logout');
 
+      button.disabled = true;
+      button.textContent = 'جارٍ الخروج...';
+
+      try {
+        const { error } = await sb.auth.signOut();
+
+        if (error) {
+          throw error;
+        }
+
+        authMessage.textContent = 'تم تسجيل الخروج بنجاح.';
+      } catch (error) {
+        alert('تعذر تسجيل الخروج: ' + error.message);
+      } finally {
+        button.disabled = false;
+        button.textContent = 'تسجيل الخروج';
+      }
+    });
   sb.auth.onAuthStateChange((_event, session) => {
     updateMizanAuthUI(session);
   });
