@@ -197,44 +197,37 @@
       تسجيل الخروج
     </button>
   `;
+  // إضافة شريط الحساب داخل صفحة الإعدادات
+  accountBar.style.display = 'none';
 
+  const settingsContainer = document.querySelector('#page-settings');
 
+  if (settingsContainer) {
+    const settingsForm = settingsContainer.querySelector('#settingsForm');
+
+    if (settingsForm) {
+      settingsForm.insertAdjacentElement('beforebegin', accountBar);
+    } else {
+      settingsContainer.appendChild(accountBar);
+    }
+  }
   const updateMizanAuthUI = (session) => {
     const loggedIn = Boolean(session);
 
+    // إظهار شاشة تسجيل الدخول عند عدم وجود جلسة
     authScreen.style.display = loggedIn ? 'none' : 'flex';
-    accountBar.style.display = loggedIn ? 'flex' : 'none';
+
+    // إظهار شريط الحساب فقط داخل صفحة الإعدادات
+    const settingsPage = document.querySelector('#page-settings');
+    const settingsIsActive =
+      settingsPage?.classList.contains('active') || false;
+
+    accountBar.style.display =
+      loggedIn && settingsIsActive ? 'flex' : 'none';
 
     document.getElementById('mizan-account-email').textContent =
       session?.user?.email || 'حسابي';
   };
-
-  document.getElementById('mizan-logout')
-    .addEventListener('click', async () => {
-      const button = document.getElementById('mizan-logout');
-
-      button.disabled = true;
-      button.textContent = 'جارٍ الخروج...';
-
-      try {
-        const { error } = await sb.auth.signOut();
-        if (error) throw error;
-      } catch (error) {
-        alert('تعذر تسجيل الخروج: ' + error.message);
-      } finally {
-        button.disabled = false;
-        button.textContent = 'تسجيل الخروج';
-      }
-    });
-
-  // تحديث مكان شريط الحساب عند التنقل بين الصفحات
-  document.querySelectorAll('.nav-link[data-page]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      sb.auth.getSession().then(({ data }) => {
-        updateMizanAuthUI(data?.session || null);
-      });
-    });
-  });
 
   sb.auth.onAuthStateChange((_event, session) => {
     updateMizanAuthUI(session);
@@ -341,6 +334,14 @@
     $('#pageTitle').textContent = page === 'dashboard' ? 'أهلًا بك في ميزان 👋' : labels[page];
     $('#sidebar').classList.remove('open');
     if (page === 'reports') renderReport(); if (page === 'erp') renderERP(); if (page === 'dashboard') requestAnimationFrame(drawChart);
+     sb.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        updateMizanAuthUI(null);
+        return;
+      }
+
+      updateMizanAuthUI(data?.session || null);
+    });
   };
   const monthTransactions = () => state.transactions.filter(t => isThisMonth(t.date));
   const periodTransactions = () => $('#dashboardPeriod').value === 'all' ? state.transactions : monthTransactions();
