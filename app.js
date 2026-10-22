@@ -1,7 +1,8 @@
-/* ميزان — نموذج أولي محاسبي يعمل محليًا في المتصفح. */
+/* ميزان — نموذج أولي محاسبي يعمل محليًا ومع السحابة (Supabase). */
 (() => {
   'use strict';
-    // الاتصال بقاعدة بيانات Supabase
+  
+  // الاتصال بقاعدة بيانات Supabase
   const SUPABASE_URL = 'https://dpmnbthmorzzzqynqswd.supabase.co';
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_s6VZuPwcm471z2kZoadVOw_fcnVBS84';
 
@@ -9,7 +10,10 @@
     SUPABASE_URL,
     SUPABASE_PUBLISHABLE_KEY
   );
-    // شاشة تسجيل الدخول وإنشاء الحساب
+
+  let currentUserId = null;
+
+  // شاشة تسجيل الدخول وإنشاء الحساب
   const authScreen = document.createElement('div');
 
   authScreen.id = 'mizan-auth-screen';
@@ -161,8 +165,7 @@
       authSubmit.disabled = false;
     }
   });
-  // إظهار التطبيق للمستخدم المسجل فقط
- 
+
   // إنشاء شريط الحساب داخل صفحة الإعدادات والبيانات
   const accountBar = document.createElement('div');
   accountBar.id = 'mizan-account-bar';
@@ -197,7 +200,7 @@
       تسجيل الخروج
     </button>
   `;
-  // إضافة شريط الحساب داخل صفحة الإعدادات
+
   accountBar.style.display = 'none';
 
   const settingsContainer = document.querySelector('#page-settings');
@@ -211,13 +214,12 @@
       settingsContainer.appendChild(accountBar);
     }
   }
+
   const updateMizanAuthUI = (session) => {
     const loggedIn = Boolean(session);
 
-    // إظهار شاشة تسجيل الدخول عند عدم وجود جلسة
     authScreen.style.display = loggedIn ? 'none' : 'flex';
 
-    // إظهار شريط الحساب فقط داخل صفحة الإعدادات
     const settingsPage = document.querySelector('#page-settings');
     const settingsIsActive =
       settingsPage?.classList.contains('active') || false;
@@ -225,45 +227,31 @@
     accountBar.style.display =
       loggedIn && settingsIsActive ? 'flex' : 'none';
 
-    document.getElementById('mizan-account-email').textContent =
-      session?.user?.email || 'حسابي';
+    const emailEl = document.getElementById('mizan-account-email');
+    if (emailEl) {
+      emailEl.textContent = session?.user?.email || 'حسابي';
+    }
   };
-  // تشغيل زر تسجيل الخروج
-  document.getElementById('mizan-logout')
-    .addEventListener('click', async () => {
-      const button = document.getElementById('mizan-logout');
 
-      button.disabled = true;
-      button.textContent = 'جارٍ الخروج...';
+  const logoutBtn = document.getElementById('mizan-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      logoutBtn.disabled = true;
+      logoutBtn.textContent = 'جارٍ الخروج...';
 
       try {
         const { error } = await sb.auth.signOut();
-
-        if (error) {
-          throw error;
-        }
-
+        if (error) throw error;
         authMessage.textContent = 'تم تسجيل الخروج بنجاح.';
       } catch (error) {
         alert('تعذر تسجيل الخروج: ' + error.message);
       } finally {
-        button.disabled = false;
-        button.textContent = 'تسجيل الخروج';
+        logoutBtn.disabled = false;
+        logoutBtn.textContent = 'تسجيل الخروج';
       }
     });
-  sb.auth.onAuthStateChange((_event, session) => {
-    updateMizanAuthUI(session);
-  });
+  }
 
-  sb.auth.getSession().then(({ data, error }) => {
-    if (error) {
-      authMessage.textContent = 'تعذر التحقق من تسجيل الدخول.';
-      updateMizanAuthUI(null);
-      return;
-    }
-
-    updateMizanAuthUI(data.session);
-  });
   const STORE = { transactions: 'mizan_transactions_v8', products: 'mizan_products_v8', contacts: 'mizan_contacts_v8', settings: 'mizan_settings_v8', journals: 'mizan_journals_v1', documents: 'mizan_erp_documents_v1', assets: 'mizan_fixed_assets_v1', projects: 'mizan_projects_v1', bankItems: 'mizan_bank_items_v1', auditLog: 'mizan_audit_log_v1' };
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -303,15 +291,83 @@
     node.innerHTML = `<i class="fa-solid ${isError ? 'fa-circle-exclamation' : 'fa-circle-check'}"></i><span>${esc(message)}</span>`;
     $('#toastRegion').append(node); setTimeout(() => node.remove(), 3600);
   };
-  const save = () => {
+
+  // دوال التخزين المحلي والمزامنة السحابية المتوافقة مع جدول mizan_user_data الجديد
+  async function loadFromCloud(userId) {
+    try {
+      const { data, error } = await sb
+        .from('mizan_user_data')
+        .select('data_key, payload')
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error loading from cloud:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        data.forEach(row => {
+          const key = row.data_key;
+          const val = row.payload;
+          if (key === 'transactions' && Array.isArray(val)) state.transactions = val;
+          else if (key === 'products' && Array.isArray(val)) state.products = val;
+          else if (key === 'contacts' && Array.isArray(val)) state.contacts = val;
+          else if (key === 'journals' && Array.isArray(val)) state.journals = val;
+          else if (key === 'documents' && Array.isArray(val)) state.documents = val;
+          else if (key === 'assets' && Array.isArray(val)) state.assets = val;
+          else if (key === 'projects' && Array.isArray(val)) state.projects = val;
+          else if (key === 'bankItems' && Array.isArray(val)) state.bankItems = val;
+          else if (key === 'auditLog' && Array.isArray(val)) state.auditLog = val;
+          else if (key === 'settings' && val && typeof val === 'object') state.settings = { ...state.settings, ...val };
+        });
+        saveLocal();
+        renderAll();
+        toast('تمت مزامنة البيانات من السحابة بنجاح.');
+      } else {
+        await saveToCloud(userId);
+      }
+    } catch (e) {
+      console.error('Cloud load exception:', e);
+    }
+  }
+
+  async function saveToCloud(userId = currentUserId) {
+    if (!userId) return;
+    try {
+      const keys = ['transactions', 'products', 'contacts', 'settings', 'journals', 'documents', 'assets', 'projects', 'bankItems', 'auditLog'];
+      const rows = keys.map(key => ({
+        user_id: userId,
+        data_key: key,
+        payload: state[key] !== undefined ? state[key] : (key === 'settings' ? state.settings : []),
+        updated_at: new Date().toISOString()
+      }));
+
+      const { error } = await sb.from('mizan_user_data').upsert(rows, { onConflict: 'user_id,data_key' });
+      if (error) {
+        console.error('Error saving to cloud:', error);
+      }
+    } catch (e) {
+      console.error('Cloud save exception:', e);
+    }
+  }
+
+  const saveLocal = () => {
     try {
       localStorage.setItem(STORE.transactions, JSON.stringify(state.transactions));
       localStorage.setItem(STORE.products, JSON.stringify(state.products));
       localStorage.setItem(STORE.contacts, JSON.stringify(state.contacts));
       localStorage.setItem(STORE.settings, JSON.stringify(state.settings));
       ['journals','documents','assets','projects','bankItems','auditLog'].forEach(key => localStorage.setItem(STORE[key], JSON.stringify(state[key] || [])));
-    } catch (e) { console.error(e); toast('تعذر الحفظ المحلي. قد تكون مساحة التخزين ممتلئة.', true); }
+    } catch (e) { console.error(e); }
   };
+
+  const save = () => {
+    saveLocal();
+    if (currentUserId) {
+      saveToCloud(currentUserId);
+    }
+  };
+
   const makeDemoData = () => ({
     transactions: [
       { id: id(), date: dateOffset(-1), type: 'income', category: 'خدمات', description: 'تحصيل مقابل خدمات محاسبية', amount: 12500, tax: 0, contact: 'شركة النور للتجارة', note: 'دفعة مستلمة' },
@@ -337,13 +393,14 @@
       { id: id(), name: 'مكتبة النيل', type: 'supplier', phone: '0220000002', balance: 6500, notes: '' }
     ]
   });
+
   const readSaved = () => {
     try {
       const loaded = {};
       Object.keys(STORE).forEach(key => { const raw = localStorage.getItem(STORE[key]); loaded[key] = raw === null ? null : JSON.parse(raw); });
       ['transactions','products','contacts','journals','documents','assets','projects','bankItems','auditLog'].forEach(key => { if (Array.isArray(loaded[key])) state[key] = loaded[key]; });
       if (loaded.settings && typeof loaded.settings === 'object') state.settings = { ...state.settings, ...loaded.settings };
-      if ([loaded.transactions, loaded.products, loaded.contacts].every(v => v === null)) { const demo = makeDemoData(); state.transactions = demo.transactions; state.products = demo.products; state.contacts = demo.contacts; save(); }
+      if ([loaded.transactions, loaded.products, loaded.contacts].every(v => v === null)) { const demo = makeDemoData(); state.transactions = demo.transactions; state.products = demo.products; state.contacts = demo.contacts; saveLocal(); }
       if (!Array.isArray(state.transactions) || !Array.isArray(state.products) || !Array.isArray(state.contacts)) throw new Error('bad data');
     } catch (e) { console.warn('Could not load saved data', e); state = { transactions: [], products: [], contacts: [], journals: [], documents: [], assets: [], projects: [], bankItems: [], auditLog: [], settings: { businessName: 'مشروعي التجاري', ownerName: '', currency: 'EGP', taxRate: 14 } }; toast('تعذر قراءة البيانات السابقة؛ تم بدء مساحة عمل فارغة.', true); }
   };
@@ -356,15 +413,16 @@
     $('#pageTitle').textContent = page === 'dashboard' ? 'أهلًا بك في ميزان 👋' : labels[page];
     $('#sidebar').classList.remove('open');
     if (page === 'reports') renderReport(); if (page === 'erp') renderERP(); if (page === 'dashboard') requestAnimationFrame(drawChart);
-     sb.auth.getSession().then(({ data, error }) => {
+    
+    sb.auth.getSession().then(({ data, error }) => {
       if (error) {
         updateMizanAuthUI(null);
         return;
       }
-
       updateMizanAuthUI(data?.session || null);
     });
   };
+
   const monthTransactions = () => state.transactions.filter(t => isThisMonth(t.date));
   const periodTransactions = () => $('#dashboardPeriod').value === 'all' ? state.transactions : monthTransactions();
 
@@ -392,6 +450,7 @@
     $('#categoryLegend').innerHTML = topCats.length ? topCats.map((c,i)=>`<div class="category-row"><span class="category-name"><i class="legend-dot" style="background:${colors[i%colors.length]}"></i>${esc(c[0])}</span><strong>${money(c[1])}</strong></div>`).join('') : '<small style="color:var(--muted)">لا توجد مصروفات مسجلة في هذه الفترة.</small>';
     renderInsights(txs); requestAnimationFrame(drawChart);
   }
+
   function renderInsights(txs) {
     const income = revenues(txs), expense = expenses(txs), profit = income - expense;
     const byCategory = {}; txs.filter(t => ['expense','purchase'].includes(t.type)).forEach(t => byCategory[t.category || 'أخرى'] = (byCategory[t.category || 'أخرى'] || 0) + Number(t.amount || 0));
@@ -403,6 +462,7 @@
     if (!top && !low.length && !state.transactions.length) items.push({ icon:'fa-wand-magic-sparkles', title:'ابدأ بتسجيل أول حركة', body:'بعد إضافة الحركات، ستظهر هنا ملاحظات مبنية على الأرقام المسجلة.' });
     $('#insightsList').innerHTML = items.slice(0,3).map(x=>`<div class="insight-item"><span class="insight-symbol"><i class="fa-solid ${x.icon}"></i></span><div><strong>${esc(x.title)}</strong><p>${esc(x.body)}</p></div></div>`).join('');
   }
+
   function drawChart() {
     const canvas = $('#cashflowChart'); if (!canvas || !$('#page-dashboard').classList.contains('active')) return;
     const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return;
@@ -424,6 +484,7 @@
     state.auditLog.unshift({ id: id(), at: new Date().toISOString(), action, detail });
     state.auditLog = state.auditLog.slice(0, 60);
   }
+
   const docTypeLabels = { sale: 'مبيعات', purchase: 'مشتريات' };
   const docStatusLabels = { draft: 'مسودة', approved: 'معتمدة', posted: 'مرحّلة' };
   const projectTypeLabels = { project: 'مشروع', manufacturing: 'أمر إنتاج' };
@@ -441,6 +502,7 @@
     const min = options.min !== undefined ? ` min="${options.min}"` : ''; const max = options.max !== undefined ? ` max="${options.max}"` : ''; const step = options.step ? ` step="${options.step}"` : '';
     return `<label class="${full}">${esc(label)}<input name="${esc(name)}" type="${type}" value="${esc(value)}"${required}${placeholder}${min}${max}${step}></label>`;
   };
+
   const openModal = (kind, item = null, defaults = {}) => {
     modalKind = kind; editingId = item?.id || null; const val = { ...(item || {}), ...defaults };
     let title = '', subtitle = '', fields = '';
@@ -508,8 +570,10 @@
     $('#modalTitle').textContent = title; $('#modalSubtitle').textContent = subtitle; $('#modalFields').innerHTML = fields; $('#modalBackdrop').classList.remove('hidden');
     setTimeout(() => $('#modalFields input, #modalFields select')?.focus(), 50);
   };
+
   const closeModal = () => { $('#modalBackdrop').classList.add('hidden'); $('#modalForm').reset(); modalKind = null; editingId = null; };
   const formObject = (form) => Object.fromEntries(new FormData(form).entries());
+
   function saveModal(e) {
     e.preventDefault(); if (!modalKind) return;
     const v = formObject(e.currentTarget);
@@ -537,7 +601,7 @@
       if(state.documents.some(d=>d.number===v.number.trim()&&d.id!==editingId))return toast('رقم الفاتورة مستخدم بالفعل.',true);
       const type=modalKind==='salesdoc'?'sale':'purchase';
       const taxAmount=Math.round(subtotal*taxRate)/100; const totalAmount=Math.round((subtotal+taxAmount)*100)/100; const item={id:editingId||id(),number:v.number.trim(),type,date:v.date,contact:v.contact.trim(),description:v.description.trim(),subtotal,taxRate,taxAmount,total:totalAmount,costCenter:v.costCenter.trim(),status:'draft',transactionId:null};
-      if(editingId)state.documents=state.documents.map(d=>d.id===editingId?item:d);else state.documents.unshift(item);logAudit('إنشاء فاتورة',`${docTypeLabels[type]} ${item.number}`);toast('حُفظت الفاتورة كمسودة. اعتمدها ثم رحّلها لتسجيل أثرها المالي.');
+      if(editingId)state.documents=state.documents.map(d=>d.id===editingId?item:d);else state.documents.unshift(item);logAudit('إنشاء فاتورة',`${docTypeLabels[type]} ${item.number}`);toast('حُفظت الفاتورة كمسودة. اعتمدها ثم رحّلت لتسجيل أثرها المالي.');
     } else if (modalKind === 'asset') {
       const item={id:editingId||id(),name:v.name.trim(),date:v.date,cost:Number(v.cost),lifeYears:Number(v.lifeYears),residual:Number(v.residual)||0,costCenter:v.costCenter.trim()};
       if(!item.name||!(item.cost>0)||!Number.isFinite(item.cost)||!(item.lifeYears>0)||item.residual<0||item.residual>item.cost)return toast('راجع اسم الأصل والتكلفة والعمر والقيمة التخريدية.',true);
@@ -560,18 +624,21 @@
     $('#transactionsTable').innerHTML=items.map(t=>`<tr><td><div class="transaction-name"><span class="transaction-symbol"><i class="fa-solid ${typeIcons[t.type]||'fa-receipt'}"></i></span>${esc(t.description)}</div></td><td><span class="type-badge ${t.type}">${typeLabels[t.type]||'حركة'}</span></td><td>${esc(t.category||'—')}</td><td>${dateText(t.date)}</td><td><span class="${moneyTypeClass(t.type)}">${['income','sale'].includes(t.type)?'+':'−'} ${money(t.amount)}</span></td><td>${esc(t.note||'—')}</td><td><div class="contact-actions"><button class="small-action edit-transaction" data-id="${esc(t.id)}" title="تعديل"><i class="fa-solid fa-pen"></i></button><button class="small-action delete-transaction" data-id="${esc(t.id)}" title="حذف"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('');
     $('#transactionsEmpty').classList.toggle('hidden',items.length>0);$('#transactionResultsCount').textContent=`${num(items.length)} حركة`;
   }
+
   function renderInventory() {
     const query=($('#inventorySearch').value||'').trim().toLowerCase(),filter=$('#stockFilter').value;
     const items=state.products.filter(p=>(`${p.name} ${p.sku}`.toLowerCase().includes(query))&&(filter==='all'||Number(p.quantity)<=Number(p.reorder)));
     $('#inventoryTable').innerHTML=items.map(p=>{const low=Number(p.quantity)<=Number(p.reorder);return `<tr><td><div class="transaction-name"><span class="transaction-symbol"><i class="fa-solid fa-box"></i></span>${esc(p.name)}</div></td><td>${esc(p.sku||'—')}</td><td><strong>${num(p.quantity)}</strong></td><td>${money(p.cost)}</td><td><strong>${money(productValue(p))}</strong></td><td><span class="stock-badge" style="background:${low?'#492e1b':'#0b3b35'};color:${low?'#ffc47f':'#47dfbc'}">${low?'مخزون منخفض':'متوفر'}</span></td><td><div class="contact-actions"><button class="small-action edit-product" data-id="${esc(p.id)}" title="تعديل"><i class="fa-solid fa-pen"></i></button><button class="small-action delete-product" data-id="${esc(p.id)}" title="حذف"><i class="fa-solid fa-trash"></i></button></div></td></tr>`;}).join('');
     const value=state.products.reduce((s,p)=>s+productValue(p),0);$('#productsCount').textContent=num(state.products.length);$('#inventoryValue').textContent=money(value);$('#lowStockCount').textContent=num(state.products.filter(p=>Number(p.quantity)<=Number(p.reorder)).length);$('#inventoryEmpty').classList.toggle('hidden',items.length>0);
   }
+
   function renderContacts() {
     const query=($('#contactsSearch').value||'').trim().toLowerCase(),filter=$('#contactTypeFilter').value;
     const items=state.contacts.filter(c=>(filter==='all'||c.type===filter)&&`${c.name} ${c.phone} ${c.notes}`.toLowerCase().includes(query));
     $('#contactsGrid').innerHTML=items.map(c=>`<div class="contact-card"><div class="contact-avatar">${esc(c.name.slice(0,1))}</div><div class="contact-details"><h4>${esc(c.name)}</h4><p>${esc(c.phone||'لا يوجد رقم هاتف')}</p><span class="type-badge ${c.type==='customer'?'income':'purchase'}">${c.type==='customer'?'عميل':'مورد'}</span><div class="contact-meta"><span>${c.type==='customer'?'مستحقات لك':'مستحقات عليك'}</span><strong>${money(c.balance)}</strong></div></div><div class="contact-actions"><button class="small-action edit-contact" data-id="${esc(c.id)}" title="تعديل"><i class="fa-solid fa-pen"></i></button><button class="small-action delete-contact" data-id="${esc(c.id)}" title="حذف"><i class="fa-solid fa-trash"></i></button></div></div>`).join('');
     $('#customersCount').textContent=num(state.contacts.filter(c=>c.type==='customer').length);$('#suppliersCount').textContent=num(state.contacts.filter(c=>c.type==='supplier').length);$('#receivablesTotal').textContent=money(total(state.contacts,c=>c.type==='customer','balance'));$('#contactsEmpty').classList.toggle('hidden',items.length>0);
   }
+
   let activeReport='income';
   function renderReport() {
     $('#reportDate').textContent=`تاريخ الإصدار: ${dateText(todayISO())}`;
@@ -603,6 +670,7 @@
     if(/تاريخ|الخميس|اليوم|مبيعات يوم|مبيعات/.test(q)){const dayMatch=q.match(/(\d{4}-\d{2}-\d{2})/);const target=dayMatch?dayMatch[1]:todayISO();const todayTx=all.filter(t=>t.date===target);return `حركات ${dateText(target)}:\n• الإيرادات والمبيعات: ${money(revenues(todayTx))}\n• المصروفات والمشتريات: ${money(expenses(todayTx))}\n• عدد الحركات: ${todayTx.length}\n\nلو تقصد تاريخًا آخر، اكتب التاريخ بصيغة سنة-شهر-يوم (YYYY-MM-DD).`;}
     return 'أقدر أجيب لك ملخص الإيرادات والمصروفات والربح، وأعلى بنود الإنفاق، والأصناف منخفضة المخزون، وأرصدة العملاء والموردين. جرّب اختيار أحد الأسئلة المقترحة. هذه النسخة تستخدم قواعد بسيطة وليست نموذج ذكاء اصطناعي متصلًا بالإنترنت.';
   }
+
   function appendChat(text, who='assistant') { const wrapper=document.createElement('div');wrapper.className=`chat-message ${who}`; const avatar=document.createElement('div');avatar.className='message-avatar';avatar.innerHTML=who==='user'?'<i class="fa-solid fa-user"></i>':'<i class="fa-solid fa-robot"></i>';const bubble=document.createElement('div');bubble.className='message-bubble';const p=document.createElement('p');p.textContent=text;bubble.append(p);wrapper.append(avatar,bubble);$('#chatMessages').append(wrapper);$('#chatMessages').scrollTop=$('#chatMessages').scrollHeight; }
   function sendChat(text) {const question=(text||'').trim();if(!question)return;appendChat(question,'user');$('#chatInput').value='';setTimeout(()=>appendChat(answerQuestion(question),'assistant'),180);}
 
@@ -610,7 +678,7 @@
   function exportCsv() {const rows=[['التاريخ','النوع','الوصف','التصنيف','المبلغ','الضريبة %','العميل / المورد','ملاحظات'],...state.transactions.map(t=>[t.date,typeLabels[t.type]||t.type,t.description,t.category,t.amount,t.tax,t.contact,t.note])];const csv='\ufeff'+rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\r\n');downloadFile(`mizan-transactions-${todayISO()}.csv`,csv,'text/csv;charset=utf-8');toast('تم تجهيز ملف CSV للتنزيل.');}
   function backup() {downloadFile(`mizan-backup-${todayISO()}.json`,JSON.stringify({version:2,exportedAt:new Date().toISOString(),...state},null,2),'application/json');toast('تم تنزيل النسخة الاحتياطية.');}
   function loadDemo() {if(!confirm('سيتم استبدال البيانات الحالية ببيانات تجريبية. هل تريد المتابعة؟'))return;const demo=makeDemoData();state.transactions=demo.transactions;state.products=demo.products;state.contacts=demo.contacts;state.journals=[];state.documents=[];state.assets=[];state.projects=[];state.bankItems=[];state.auditLog=[];save();renderAll();toast('تمت استعادة البيانات التجريبية.');}
-  function clearAll() {if(!confirm('هل أنت متأكد؟ سيتم حذف كل الحركات والأصناف والعملاء والموردين المحفوظين على هذا المتصفح.'))return;state.transactions=[];state.products=[];state.contacts=[];state.journals=[];state.documents=[];state.assets=[];state.projects=[];state.bankItems=[];state.auditLog=[];save();renderAll();toast('تم مسح البيانات.');}
+  function clearAll() {if(!confirm('هل أنت متأكد؟ سيتم حذف كل الحركات والأصناف والعملاء والموردين المحفوظين على هذا المتصفح وحسابك السحابي.'))return;state.transactions=[];state.products=[];state.contacts=[];state.journals=[];state.documents=[];state.assets=[];state.projects=[];state.bankItems=[];state.auditLog=[];save();renderAll();toast('تم مسح البيانات.');}
 
   function renderERP() {
     const journals=state.journals||[], docs=state.documents||[], assets=state.assets||[], projects=state.projects||[], bank=state.bankItems||[];
@@ -695,8 +763,8 @@
   $('#exportDashboard').addEventListener('click',exportCsv);$('#exportTransactions').addEventListener('click',exportCsv);$('#backupData').addEventListener('click',backup);$('#loadDemo').addEventListener('click',loadDemo);$('#clearAllData').addEventListener('click',clearAll);
   $('#settingsForm').addEventListener('submit',e=>{e.preventDefault();state.settings={...state.settings,businessName:$('#businessName').value.trim()||'مشروعي التجاري',ownerName:$('#ownerName').value.trim(),currency:$('#currency').value,taxRate:Math.max(0,Math.min(100,Number($('#taxRate').value)||0))};save();renderAll();toast('تم حفظ إعدادات النشاط.');});$('#saveSettingsTop').addEventListener('click',()=>$('#settingsForm').requestSubmit());
   $('#restoreData').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!data||!Array.isArray(data.transactions)||!Array.isArray(data.products)||!Array.isArray(data.contacts)||!data.settings)throw new Error('invalid');if(!confirm('ستُستبدل البيانات الحالية بمحتوى النسخة المحددة. هل تريد المتابعة؟'))return;state={...state,transactions:data.transactions,products:data.products,contacts:data.contacts,journals:Array.isArray(data.journals)?data.journals:[],documents:Array.isArray(data.documents)?data.documents:[],assets:Array.isArray(data.assets)?data.assets:[],projects:Array.isArray(data.projects)?data.projects:[],bankItems:Array.isArray(data.bankItems)?data.bankItems:[],auditLog:Array.isArray(data.auditLog)?data.auditLog:[],settings:{...state.settings,...data.settings}};save();renderAll();toast('تمت استعادة النسخة الاحتياطية.');}catch{toast('الملف غير صالح أو ليس نسخة ميزان الاحتياطية.',true);}finally{e.target.value='';}});
-  $('#profileButton').addEventListener('click',()=>toast(`النشاط الحالي: ${state.settings.businessName}. هذه نسخة محلية تجريبية.`));
-  $('#helpButton').addEventListener('click',()=>toast('استخدم القائمة للتنقل، وأضف الحركات من زر «إضافة حركة». البيانات تُحفظ على نفس المتصفح.'));
+  $('#profileButton').addEventListener('click',()=>toast(`النشاط الحالي: ${state.settings.businessName}. هذه نسخة متصلة بالسحابة.`));
+  $('#helpButton').addEventListener('click',()=>toast('استخدم القائمة للتنقل، وأضف الحركات من زر «إضافة حركة». البيانات تُحفظ أونلاين وتظهر عبر أجهزتك.'));
   $('#notificationsButton').addEventListener('click',()=>{const low=state.products.filter(p=>Number(p.quantity)<=Number(p.reorder));toast(low.length?`تنبيه: ${low.length} صنف منخفض المخزون (${low.slice(0,3).map(p=>p.name).join('، ')}).`:'لا توجد تنبيهات مخزون حالية.');});
 
   // Assistant interaction.
@@ -705,7 +773,7 @@
   $('#clearChat').addEventListener('click',()=>{$('#chatMessages').innerHTML='';appendChat('تم بدء محادثة جديدة. اسأل عن الأرقام المسجلة أو المخزون.');});
   $('#voiceButton').addEventListener('click',()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast('التعرف الصوتي غير مدعوم في هذا المتصفح. جرّب Chrome مع السماح بالميكروفون.',true);return;}const rec=new SR();rec.lang='ar-EG';rec.interimResults=false;rec.maxAlternatives=1;rec.onresult=e=>{$('#chatInput').value=e.results[0][0].transcript;$('#chatInput').focus();};rec.onerror=()=>toast('لم نتمكن من التقاط الصوت. تحقق من صلاحية الميكروفون.',true);rec.start();});
 
-  // Invoice OCR. Recognition is performed in the browser via Tesseract.js; the result must be reviewed.
+  // Invoice OCR.
   $('#invoiceImage').addEventListener('change',e=>{selectedInvoiceFile=e.target.files?.[0]||null;$('#runOcr').disabled=!selectedInvoiceFile;if(selectedInvoiceFile){const url=URL.createObjectURL(selectedInvoiceFile);$('#invoicePreview').src=url;$('#ocrResult').classList.remove('hidden');$('#ocrText').textContent='جاهز لمحاولة القراءة.';$('#ocrStatus').textContent=`الصورة المختارة: ${selectedInvoiceFile.name}. اضغط «قراءة الفاتورة» لبدء المحاولة.`;extractedOcr='';}});
   $('#runOcr').addEventListener('click',async()=>{if(!selectedInvoiceFile)return;if(!window.Tesseract){$('#ocrStatus').textContent='مكتبة القراءة غير متاحة. تحقق من اتصال الإنترنت ثم أعد تحميل الصفحة.';return;}$('#runOcr').disabled=true;$('#ocrStatus').textContent='جارٍ قراءة الصورة... قد تستغرق العملية وقتًا حسب حجم الصورة واتصال الإنترنت.';try{const result=await Tesseract.recognize(selectedInvoiceFile,'ara+eng',{logger:m=>{if(m.status==='recognizing text')$('#ocrStatus').textContent=`جارٍ تحليل النص: ${Math.round((m.progress||0)*100)}%`;}});extractedOcr=result.data.text||'';$('#ocrText').textContent=extractedOcr||'لم يتم التعرف على نص واضح.';$('#ocrStatus').textContent=extractedOcr?'انتهت المحاولة. راجع النص المستخرج؛ لا تحفظ أي مبلغ قبل مراجعته.':'لم يتم العثور على نص واضح. جرّب صورة أوضح وإضاءة أفضل.';}catch(err){console.error(err);$('#ocrStatus').textContent='حدث خطأ أثناء قراءة الفاتورة. جرّب صورة أخرى أو تحقق من اتصال الإنترنت.';}finally{$('#runOcr').disabled=!selectedInvoiceFile;}});
   $('#useOcrData').addEventListener('click',()=>{let amount='';const text=extractedOcr;const patterns=[/(?:الإجمالي|الاجمالي|المجموع|total|grand\s*total|net\s*amount)[^\d]{0,25}([\d,٬.]{2,})/i,/(?:جنيه|EGP|LE|ج\.م)[^\d]{0,10}([\d,٬.]{2,})/i];for(const re of patterns){const m=text.match(re);if(m){amount=m[1].replace(/[٬,]/g,'').replace(/\.(?=.*\.)/g,'');if(Number.isFinite(Number(amount))&&Number(amount)>0)break;amount='';}}const defaults={type:'purchase',category:'مشتريات بضاعة',description:'فاتورة مشتريات (راجع البيانات المستخرجة)',note:text.slice(0,600),contact:'',date:todayISO()};if(amount)defaults.amount=Number(amount);else toast('لم أستطع تحديد الإجمالي بثقة؛ اكتب المبلغ يدويًا بعد مراجعة الفاتورة.',true);openModal('transaction',null,defaults);});
@@ -713,5 +781,31 @@
   // Keep canvas crisp on resize.
   window.addEventListener('resize',()=>requestAnimationFrame(drawChart));
   $('#todayLabel').textContent=new Intl.DateTimeFormat('ar-EG',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date());$('#yearLabel').textContent=new Date().getFullYear();
-  readSaved();renderAll();
+
+  // تهيئة الجلسة وقراءة البيانات
+  readSaved();
+  
+  sb.auth.onAuthStateChange(async (_event, session) => {
+    currentUserId = session?.user?.id || null;
+    updateMizanAuthUI(session);
+    if (currentUserId) {
+      await loadFromCloud(currentUserId);
+    }
+  });
+
+  sb.auth.getSession().then(async ({ data, error }) => {
+    if (error) {
+      authMessage.textContent = 'تعذر التحقق من تسجيل الدخول.';
+      updateMizanAuthUI(null);
+      renderAll();
+      return;
+    }
+    currentUserId = data?.session?.user?.id || null;
+    updateMizanAuthUI(data?.session || null);
+    if (currentUserId) {
+      await loadFromCloud(currentUserId);
+    } else {
+      renderAll();
+    }
+  });
 })();
